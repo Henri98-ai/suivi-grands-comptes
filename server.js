@@ -1,14 +1,78 @@
 const express = require('express');
 const path = require('path');
-const { readDb, writeDb, genId } = require('./db');
+const {
+  readDb, writeDb, genId, ensureFieldsConfig,
+} = require('./db');
 const { summarizeTranscript } = require('./summarizer');
 const { BEESTART_TEMPLATE } = require('./templates');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const VALID_FIELD_TYPES = ['text', 'textarea', 'date'];
 
 app.use(express.json({ limit: '5mb' })); // transcriptions parfois longues
 app.use(express.static(path.join(__dirname, 'public')));
+
+function emptyValueFor(type) {
+  if (type === 'date') return null;
+  return '';
+}
+
+// ---------- Champs configurables (cabinet & jalon) ----------
+
+app.get('/api/fields/:entity', (req, res) => {
+  const db = ensureFieldsConfig(readDb());
+  const list = db.fieldsConfig[req.params.entity];
+  if (!list) return res.status(404).json({ error: 'Type de champ inconnu' });
+  res.json(list);
+});
+
+app.post('/api/fields/:entity', (req, res) => {
+  const db = ensureFieldsConfig(readDb());
+  const list = db.fieldsConfig[req.params.entity];
+  if (!list) return res.status(404).json({ error: 'Type de champ inconnu' });
+
+  const { label } = req.body;
+  if (!label || !label.trim()) return res.status(400).json({ error: 'Le libellé du champ est requis' });
+  const type = VALID_FIELD_TYPES.includes(req.body.type) ? req.body.type : 'text';
+
+  list.push({ id: genId('champ'), label: label.trim(), type });
+  writeDb(db);
+  res.status(201).json(list);
+});
+
+app.put('/api/fields/:entity/:fieldId', (req, res) => {
+  const db = ensureFieldsConfig(readDb());
+  const list = db.fieldsConfig[req.params.entity];
+  if (!list) return res.status(404).json({ error: 'Type de champ inconnu' });
+  const field = list.find((f) => f.id === req.params.fieldId);
+  if (!field) return res.status(404).json({ error: 'Champ introuvable' });
+  if (field.fixed) return res.status(400).json({ error: 'Ce champ ne peut pas être modifié' });
+
+  if (req.body.label !== undefined) {
+    if (!req.body.label.trim()) return res.status(400).json({ error: 'Le libellé ne peut pas être vide' });
+    field.label = req.body.label.trim();
+  }
+  if (req.body.type !== undefined && VALID_FIELD_TYPES.includes(req.body.type)) {
+    field.type = req.body.type;
+  }
+
+  writeDb(db);
+  res.json(list);
+});
+
+app.delete('/api/fields/:entity/:fieldId', (req, res) => {
+  const db = ensureFieldsConfig(readDb());
+  const list = db.fieldsConfig[req.params.entity];
+  if (!list) return res.status(404).json({ error: 'Type de champ inconnu' });
+  const idx = list.findIndex((f) => f.id === req.params.fieldId);
+  if (idx === -1) return res.status(404).json({ error: 'Champ introuvable' });
+  if (list[idx].fixed) return res.status(400).json({ error: 'Ce champ ne peut pas être supprimé' });
+
+  list.splice(idx, 1);
+  writeDb(db);
+  res.json(list);
+});
 
 // ---------- Cabinets ----------
 
@@ -25,25 +89,22 @@ app.get('/api/cabinets/:id', (req, res) => {
 });
 
 app.post('/api/cabinets', (req, res) => {
-  const db = readDb();
-  const {
-    nom, groupePilote, commercial, ctd, gestionnaire, dateDebut, notes,
-  } = req.body;
+  const db = ensureFieldsConfig(readDb());
+  const fields = db.fieldsConfig.cabinet;
 
+  const nom = req.body.nom && req.body.nom.trim();
   if (!nom) return res.status(400).json({ error: 'Le nom du cabinet est requis' });
 
   const cabinet = {
     id: genId('cab'),
-    nom,
-    groupePilote: groupePilote || '',
-    commercial: commercial || '',
-    ctd: ctd || '',
-    gestionnaire: gestionnaire || '',
-    dateDebut: dateDebut || null,
-    notes: notes || '',
     createdAt: new Date().toISOString(),
     jalons: [],
   };
+
+  fields.forEach((f) => {
+    if (f.id === 'nom') { cabinet.nom = nom; return; }
+    cabinet[f.id] = req.body[f.id] !== undefined ? req.body[f.id] : emptyValueFor(f.type);
+  });
 
   db.cabinets.push(cabinet);
   writeDb(db);
@@ -51,13 +112,12 @@ app.post('/api/cabinets', (req, res) => {
 });
 
 app.put('/api/cabinets/:id', (req, res) => {
-  const db = readDb();
+  const db = ensureFieldsConfig(readDb());
   const cabinet = db.cabinets.find((c) => c.id === req.params.id);
   if (!cabinet) return res.status(404).json({ error: 'Cabinet introuvable' });
 
-  const fields = ['nom', 'groupePilote', 'commercial', 'ctd', 'gestionnaire', 'dateDebut', 'notes'];
-  fields.forEach((f) => {
-    if (req.body[f] !== undefined) cabinet[f] = req.body[f];
+  db.fieldsConfig.cabinet.forEach((f) => {
+    if (req.body[f.id] !== undefined) cabinet[f.id] = req.body[f.id];
   });
 
   writeDb(db);
@@ -76,23 +136,27 @@ app.delete('/api/cabinets/:id', (req, res) => {
 // ---------- Jalons ----------
 
 app.post('/api/cabinets/:id/jalons', (req, res) => {
-  const db = readDb();
+  const db = ensureFieldsConfig(readDb());
   const cabinet = db.cabinets.find((c) => c.id === req.params.id);
   if (!cabinet) return res.status(404).json({ error: 'Cabinet introuvable' });
 
-  const { nom, attendu, datePrevue } = req.body;
+  const fields = db.fieldsConfig.jalon;
+  const nom = req.body.nom && req.body.nom.trim();
   if (!nom) return res.status(400).json({ error: 'Le nom du jalon est requis' });
 
   const jalon = {
     id: genId('jal'),
-    nom,
-    attendu: attendu || '',
-    dateInitiale: datePrevue || null,
-    datePrevue: datePrevue || null,
+    dateInitiale: req.body.datePrevue || null,
+    datePrevue: req.body.datePrevue || null,
     statut: 'a_venir', // a_venir | en_cours | fait | en_retard
     historiqueDecalages: [],
     transcripts: [],
   };
+
+  fields.forEach((f) => {
+    if (f.id === 'nom') { jalon.nom = nom; return; }
+    jalon[f.id] = req.body[f.id] !== undefined ? req.body[f.id] : emptyValueFor(f.type);
+  });
 
   cabinet.jalons.push(jalon);
   writeDb(db);
@@ -122,16 +186,16 @@ app.post('/api/cabinets/:id/jalons/appliquer-trame', (req, res) => {
 });
 
 app.put('/api/cabinets/:id/jalons/:jalonId', (req, res) => {
-  const db = readDb();
+  const db = ensureFieldsConfig(readDb());
   const cabinet = db.cabinets.find((c) => c.id === req.params.id);
   if (!cabinet) return res.status(404).json({ error: 'Cabinet introuvable' });
   const jalon = cabinet.jalons.find((j) => j.id === req.params.jalonId);
   if (!jalon) return res.status(404).json({ error: 'Jalon introuvable' });
 
-  const fields = ['nom', 'attendu', 'statut'];
-  fields.forEach((f) => {
-    if (req.body[f] !== undefined) jalon[f] = req.body[f];
+  db.fieldsConfig.jalon.forEach((f) => {
+    if (req.body[f.id] !== undefined) jalon[f.id] = req.body[f.id];
   });
+  if (req.body.statut !== undefined) jalon.statut = req.body.statut;
 
   writeDb(db);
   res.json(jalon);

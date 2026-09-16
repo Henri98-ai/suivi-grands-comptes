@@ -369,3 +369,77 @@ table.overview-table tbody tr:last-child td {
 
 .next-jalon-cell { font-size: 13px; }
 .next-jalon-cell .nj-date { color: var(--text-muted); font-size: 12px; }
+
+/* ---------- Champs configurables ---------- */
+
+.dlg-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.dlg-header-row h2 { margin: 0; }
+
+.manage-fields-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 480px;
+  max-width: 90vw;
+}
+
+.manage-fields-body h2 { margin: 0; font-size: 17px; }
+
+.field-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-row .field-label-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.field-row .field-type-select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.add-field-row {
+  display: flex;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.add-field-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.add-field-row select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}

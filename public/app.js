@@ -1,6 +1,7 @@
 let cabinets = [];
 let activeCabinetId = null;
 let resumeAutoDisponible = false;
+let fieldsConfig = { cabinet: [], jalon: [] };
 
 const cabinetList = document.getElementById('cabinet-list');
 const mainContent = document.getElementById('main-content');
@@ -14,12 +15,14 @@ const dlgDecaler = document.getElementById('dlg-decaler');
 const formDecaler = document.getElementById('form-decaler');
 const dlgTranscript = document.getElementById('dlg-transcript');
 const formTranscript = document.getElementById('form-transcript');
+const dlgManageFields = document.getElementById('dlg-manage-fields');
 
 let editingCabinetId = null;
 let jalonTargetCabinetId = null;
 let editingJalonId = null;
 let decalerTarget = null; // {cabinetId, jalonId}
 let transcriptTarget = null; // {cabinetId, jalonId}
+let manageFieldsEntity = null; // 'cabinet' | 'jalon'
 
 const STATUTS = {
   a_venir: 'À venir',
@@ -44,6 +47,11 @@ async function api(path, options = {}) {
 async function loadConfig() {
   const cfg = await api('/api/config');
   resumeAutoDisponible = cfg.resumeAutoDisponible;
+}
+
+async function loadFieldsConfig() {
+  fieldsConfig.cabinet = await api('/api/fields/cabinet');
+  fieldsConfig.jalon = await api('/api/fields/jalon');
 }
 
 async function loadCabinets() {
@@ -81,10 +89,6 @@ function renderCabinetList() {
     });
 }
 
-function renderEmpty() {
-  renderOverview();
-}
-
 // ---------- Vue d'ensemble ----------
 
 function computeCabinetProgress(cabinet) {
@@ -99,7 +103,6 @@ function computeCabinetProgress(cabinet) {
   else if (cabinet.jalons.some((j) => j.statut === 'en_cours')) statutGlobal = 'en_cours';
   else if (faits > 0) statutGlobal = 'en_cours';
 
-  // Prochain jalon non fait, trié par date prévue la plus proche
   const prochain = cabinet.jalons
     .filter((j) => j.statut !== 'fait')
     .sort((a, b) => {
@@ -129,6 +132,9 @@ function renderOverview() {
     return;
   }
 
+  // Colonnes dynamiques : tous les champs texte courts configurés (hors nom)
+  const infoFields = fieldsConfig.cabinet.filter((f) => f.id !== 'nom' && f.type === 'text');
+
   const rows = cabinets.map((c) => {
     const p = computeCabinetProgress(c);
     return { cabinet: c, ...p };
@@ -143,10 +149,7 @@ function renderOverview() {
         <thead>
           <tr>
             <th>Cabinet</th>
-            <th>Groupe pilote</th>
-            <th>Commercial</th>
-            <th>CTD</th>
-            <th>Gestionnaire</th>
+            ${infoFields.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}
             <th>Avancement</th>
             <th>Statut</th>
             <th>Prochain jalon</th>
@@ -156,10 +159,7 @@ function renderOverview() {
           ${rows.map((r) => `
             <tr data-cabinet-id="${r.cabinet.id}">
               <td><strong>${escapeHtml(r.cabinet.nom)}</strong></td>
-              <td>${escapeHtml(r.cabinet.groupePilote) || '—'}</td>
-              <td>${escapeHtml(r.cabinet.commercial) || '—'}</td>
-              <td>${escapeHtml(r.cabinet.ctd) || '—'}</td>
-              <td>${escapeHtml(r.cabinet.gestionnaire) || '—'}</td>
+              ${infoFields.map((f) => `<td>${escapeHtml(r.cabinet[f.id]) || '—'}</td>`).join('')}
               <td>
                 <div class="progress-cell">
                   <div class="progress-bar"><div class="progress-bar-fill" style="width:${r.pct}%;"></div></div>
@@ -193,6 +193,20 @@ function renderOverview() {
 document.getElementById('btn-overview').addEventListener('click', renderOverview);
 
 function renderCabinetDetail(cabinet) {
+  const gridFields = fieldsConfig.cabinet.filter((f) => f.id !== 'nom' && f.type !== 'textarea');
+  const textFields = fieldsConfig.cabinet.filter((f) => f.type === 'textarea');
+
+  const gridHtml = gridFields.map((f) => `
+    <div>
+      <div class="label">${escapeHtml(f.label)}</div>
+      <div class="value">${f.type === 'date' ? formatDate(cabinet[f.id]) : (escapeHtml(cabinet[f.id]) || '—')}</div>
+    </div>
+  `).join('');
+
+  const textHtml = textFields.map((f) => (cabinet[f.id]
+    ? `<p style="margin-top:12px;font-size:13px;color:var(--text-muted);white-space:pre-wrap;"><strong>${escapeHtml(f.label)} :</strong> ${escapeHtml(cabinet[f.id])}</p>`
+    : '')).join('');
+
   mainContent.innerHTML = `
     <div class="cabinet-header">
       <div class="cabinet-header-top">
@@ -202,14 +216,8 @@ function renderCabinetDetail(cabinet) {
           <button class="btn btn-sm btn-danger-outline" data-action="delete-cabinet">Supprimer</button>
         </div>
       </div>
-      <div class="info-grid">
-        <div><div class="label">Groupe pilote</div><div class="value">${escapeHtml(cabinet.groupePilote) || '—'}</div></div>
-        <div><div class="label">Commercial</div><div class="value">${escapeHtml(cabinet.commercial) || '—'}</div></div>
-        <div><div class="label">CTD</div><div class="value">${escapeHtml(cabinet.ctd) || '—'}</div></div>
-        <div><div class="label">Gestionnaire</div><div class="value">${escapeHtml(cabinet.gestionnaire) || '—'}</div></div>
-        <div><div class="label">Date de début</div><div class="value">${formatDate(cabinet.dateDebut)}</div></div>
-      </div>
-      ${cabinet.notes ? `<p style="margin-top:12px;font-size:13px;color:var(--text-muted);white-space:pre-wrap;">${escapeHtml(cabinet.notes)}</p>` : ''}
+      <div class="info-grid">${gridHtml}</div>
+      ${textHtml}
     </div>
 
     <div class="section-title">
@@ -235,6 +243,14 @@ function renderCabinetDetail(cabinet) {
 }
 
 function renderJalonCard(cabinet, jalon) {
+  const otherFields = fieldsConfig.jalon.filter((f) => f.id !== 'nom');
+  const fieldsHtml = otherFields.map((f) => {
+    const val = jalon[f.id];
+    if (!val) return '';
+    const displayVal = f.type === 'date' ? formatDate(val) : val;
+    return `<div class="jalon-attendu"><strong>${escapeHtml(f.label)} :</strong><br/>${escapeHtml(displayVal)}</div>`;
+  }).join('');
+
   const div = document.createElement('div');
   div.className = 'jalon-card';
   div.innerHTML = `
@@ -247,7 +263,7 @@ function renderJalonCard(cabinet, jalon) {
         ${Object.entries(STATUTS).map(([k, v]) => `<option value="${k}" ${k === jalon.statut ? 'selected' : ''}>${v}</option>`).join('')}
       </select>
     </div>
-    ${jalon.attendu ? `<div class="jalon-attendu">${escapeHtml(jalon.attendu)}</div>` : ''}
+    ${fieldsHtml}
     <div class="jalon-actions">
       <button class="btn btn-sm" data-action="edit-jalon">Modifier</button>
       <button class="btn btn-sm" data-action="decaler">Décaler</button>
@@ -311,21 +327,125 @@ function renderTranscriptItem(cabinetId, jalonId, t) {
   return div;
 }
 
+// ---------- Champs dynamiques (formulaires) ----------
+
+function renderFormFields(container, fields, values) {
+  container.innerHTML = '';
+  fields.forEach((f) => {
+    const label = document.createElement('label');
+    const reqMark = f.required ? ' *' : '';
+    const rawVal = values && values[f.id] !== undefined && values[f.id] !== null ? values[f.id] : '';
+    let inputHtml;
+    if (f.type === 'textarea') {
+      inputHtml = `<textarea name="${f.id}" rows="3">${escapeHtml(rawVal)}</textarea>`;
+    } else if (f.type === 'date') {
+      inputHtml = `<input name="${f.id}" type="date" value="${escapeHtml(rawVal)}" />`;
+    } else {
+      inputHtml = `<input name="${f.id}" type="text" value="${escapeHtml(rawVal)}" ${f.required ? 'required' : ''} />`;
+    }
+    label.innerHTML = `${escapeHtml(f.label)}${reqMark}${inputHtml}`;
+    container.appendChild(label);
+  });
+}
+
+function refreshOpenDialogsAfterFieldsChange() {
+  if (manageFieldsEntity === 'cabinet' && dlgCabinet.open) {
+    renderFormFields(document.getElementById('cabinet-fields-container'), fieldsConfig.cabinet, editingCabinetId ? cabinets.find((c) => c.id === editingCabinetId) : {});
+  }
+  if (manageFieldsEntity === 'jalon' && dlgJalon.open) {
+    const cab = cabinets.find((c) => c.id === jalonTargetCabinetId);
+    const jal = cab && editingJalonId ? cab.jalons.find((j) => j.id === editingJalonId) : {};
+    renderFormFields(document.getElementById('jalon-fields-container'), fieldsConfig.jalon, jal || {});
+  }
+}
+
+function openManageFields(entity) {
+  manageFieldsEntity = entity;
+  document.getElementById('manage-fields-title').textContent = entity === 'cabinet' ? 'Champs du cabinet' : 'Champs du jalon';
+  renderManageFieldsList();
+  dlgManageFields.showModal();
+}
+
+function renderManageFieldsList() {
+  const ul = document.getElementById('manage-fields-list');
+  const list = fieldsConfig[manageFieldsEntity];
+  ul.innerHTML = list.map((f) => `
+    <li class="field-row" data-field-id="${f.id}">
+      <input type="text" class="field-label-input" value="${escapeHtml(f.label)}" ${f.fixed ? 'disabled' : ''} />
+      <select class="field-type-select" ${f.fixed ? 'disabled' : ''}>
+        <option value="text" ${f.type === 'text' ? 'selected' : ''}>Texte court</option>
+        <option value="textarea" ${f.type === 'textarea' ? 'selected' : ''}>Texte long</option>
+        <option value="date" ${f.type === 'date' ? 'selected' : ''}>Date</option>
+      </select>
+      ${f.fixed
+        ? '<span class="hint">obligatoire</span>'
+        : '<button type="button" class="btn btn-sm" data-action="save-field">Enregistrer</button>'
+          + '<button type="button" class="btn btn-sm btn-danger-outline" data-action="delete-field">Supprimer</button>'}
+    </li>
+  `).join('');
+
+  ul.querySelectorAll('li').forEach((li) => {
+    const fieldId = li.dataset.fieldId;
+    const saveBtn = li.querySelector('[data-action="save-field"]');
+    const delBtn = li.querySelector('[data-action="delete-field"]');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const label = li.querySelector('.field-label-input').value.trim();
+        const type = li.querySelector('.field-type-select').value;
+        if (!label) return alert('Le libellé ne peut pas être vide');
+        try {
+          fieldsConfig[manageFieldsEntity] = await api(`/api/fields/${manageFieldsEntity}/${fieldId}`, {
+            method: 'PUT', body: JSON.stringify({ label, type }),
+          });
+          renderManageFieldsList();
+          refreshOpenDialogsAfterFieldsChange();
+        } catch (e) { alert(e.message); }
+      });
+    }
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (!confirm('Supprimer ce champ ? Les valeurs déjà saisies resteront en base mais ne seront plus affichées ni modifiables.')) return;
+        try {
+          fieldsConfig[manageFieldsEntity] = await api(`/api/fields/${manageFieldsEntity}/${fieldId}`, { method: 'DELETE' });
+          renderManageFieldsList();
+          refreshOpenDialogsAfterFieldsChange();
+        } catch (e) { alert(e.message); }
+      });
+    }
+  });
+}
+
+document.getElementById('btn-add-field').addEventListener('click', async () => {
+  const labelInput = document.getElementById('new-field-label');
+  const typeSelect = document.getElementById('new-field-type');
+  const label = labelInput.value.trim();
+  if (!label) return alert('Indique un nom de champ');
+  try {
+    fieldsConfig[manageFieldsEntity] = await api(`/api/fields/${manageFieldsEntity}`, {
+      method: 'POST', body: JSON.stringify({ label, type: typeSelect.value }),
+    });
+    labelInput.value = '';
+    typeSelect.value = 'text';
+    renderManageFieldsList();
+    refreshOpenDialogsAfterFieldsChange();
+  } catch (e) { alert(e.message); }
+});
+
+document.getElementById('btn-close-manage-fields').addEventListener('click', async () => {
+  dlgManageFields.close();
+  await loadCabinets();
+});
+
+document.querySelectorAll('[data-manage-fields]').forEach((btn) => {
+  btn.addEventListener('click', () => openManageFields(btn.dataset.manageFields));
+});
+
 // ---------- Actions cabinet ----------
 
 function openCabinetDialog(cabinet) {
   editingCabinetId = cabinet ? cabinet.id : null;
   document.getElementById('dlg-cabinet-title').textContent = cabinet ? 'Modifier le cabinet' : 'Nouveau cabinet';
-  formCabinet.reset();
-  if (cabinet) {
-    formCabinet.nom.value = cabinet.nom || '';
-    formCabinet.groupePilote.value = cabinet.groupePilote || '';
-    formCabinet.commercial.value = cabinet.commercial || '';
-    formCabinet.ctd.value = cabinet.ctd || '';
-    formCabinet.gestionnaire.value = cabinet.gestionnaire || '';
-    formCabinet.dateDebut.value = cabinet.dateDebut || '';
-    formCabinet.notes.value = cabinet.notes || '';
-  }
+  renderFormFields(document.getElementById('cabinet-fields-container'), fieldsConfig.cabinet, cabinet || {});
   dlgCabinet.showModal();
 }
 
@@ -356,12 +476,8 @@ function openJalonDialog(cabinetId, jalon) {
   jalonTargetCabinetId = cabinetId;
   editingJalonId = jalon ? jalon.id : null;
   document.getElementById('dlg-jalon-title').textContent = jalon ? 'Modifier le jalon' : 'Nouveau jalon';
-  formJalon.reset();
-  if (jalon) {
-    formJalon.nom.value = jalon.nom || '';
-    formJalon.attendu.value = jalon.attendu || '';
-    formJalon.datePrevue.value = jalon.datePrevue || '';
-  }
+  renderFormFields(document.getElementById('jalon-fields-container'), fieldsConfig.jalon, jalon || {});
+  formJalon.datePrevue.value = jalon && jalon.datePrevue ? jalon.datePrevue : '';
   dlgJalon.showModal();
 }
 
@@ -469,8 +585,8 @@ function formatDate(d) {
 }
 
 function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/[&<>"']/g, (m) => ({
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, (m) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[m]));
 }
@@ -479,6 +595,6 @@ function escapeHtml(str) {
 
 (async function init() {
   await loadConfig();
+  await loadFieldsConfig();
   await loadCabinets();
-  renderOverview();
 })();

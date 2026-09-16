@@ -33,14 +33,11 @@
   <!-- Modale : créer/éditer un cabinet -->
   <dialog id="dlg-cabinet">
     <form id="form-cabinet" method="dialog">
-      <h2 id="dlg-cabinet-title">Nouveau cabinet</h2>
-      <label>Nom du cabinet *<input name="nom" required /></label>
-      <label>Groupe pilote<input name="groupePilote" /></label>
-      <label>Commercial<input name="commercial" /></label>
-      <label>CTD<input name="ctd" /></label>
-      <label>Gestionnaire en charge<input name="gestionnaire" /></label>
-      <label>Date de début<input name="dateDebut" type="date" /></label>
-      <label>Notes<textarea name="notes" rows="3"></textarea></label>
+      <div class="dlg-header-row">
+        <h2 id="dlg-cabinet-title">Nouveau cabinet</h2>
+        <button type="button" class="btn btn-sm" data-manage-fields="cabinet">Gérer les champs</button>
+      </div>
+      <div id="cabinet-fields-container"></div>
       <div class="dlg-actions">
         <button type="button" class="btn" data-close>Annuler</button>
         <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -51,9 +48,11 @@
   <!-- Modale : ajouter/éditer un jalon -->
   <dialog id="dlg-jalon">
     <form id="form-jalon" method="dialog">
-      <h2 id="dlg-jalon-title">Nouveau jalon</h2>
-      <label>Nom du jalon *<input name="nom" required placeholder="ex : Formation paramétrage" /></label>
-      <label>Ce qui est attendu<textarea name="attendu" rows="3" placeholder="Décris ce qui doit être fait/validé à ce jalon"></textarea></label>
+      <div class="dlg-header-row">
+        <h2 id="dlg-jalon-title">Nouveau jalon</h2>
+        <button type="button" class="btn btn-sm" data-manage-fields="jalon">Gérer les champs</button>
+      </div>
+      <div id="jalon-fields-container"></div>
       <label>Date prévue<input name="datePrevue" type="date" /></label>
       <div class="dlg-actions">
         <button type="button" class="btn" data-close>Annuler</button>
@@ -61,6 +60,27 @@
       </div>
     </form>
   </dialog>
+
+  <!-- Modale : gérer les champs (cabinet ou jalon) -->
+  <dialog id="dlg-manage-fields">
+    <div class="manage-fields-body">
+      <h2 id="manage-fields-title">Gérer les champs</h2>
+      <ul id="manage-fields-list" class="field-list"></ul>
+      <div class="add-field-row">
+        <input id="new-field-label" type="text" placeholder="Nom du nouveau champ" />
+        <select id="new-field-type">
+          <option value="text">Texte court</option>
+          <option value="textarea">Texte long</option>
+          <option value="date">Date</option>
+        </select>
+        <button id="btn-add-field" class="btn btn-sm btn-primary" type="button">Ajouter</button>
+      </div>
+      <div class="dlg-actions">
+        <button id="btn-close-manage-fields" class="btn" type="button">Fermer</button>
+      </div>
+    </div>
+  </dialog>
+
 
   <!-- Modale : décaler un jalon -->
   <dialog id="dlg-decaler">
