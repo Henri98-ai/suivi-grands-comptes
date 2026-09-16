@@ -290,3 +290,82 @@ dialog input, dialog textarea {
 }
 
 .hint { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+/* ---------- Vue d'ensemble ---------- */
+
+.overview-table-wrap {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+table.overview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.overview-table th {
+  text-align: left;
+  background: #f9fafb;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+table.overview-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+table.overview-table tbody tr {
+  cursor: pointer;
+}
+
+table.overview-table tbody tr:hover {
+  background: #f6f8fc;
+}
+
+table.overview-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #e9ecf2;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.badge-global-en_retard { background: #fde8e8; color: #b02a2a; }
+.badge-global-termine { background: #e3f6ec; color: #1e7d47; }
+.badge-global-en_cours { background: #fff3d6; color: #92660b; }
+.badge-global-a_venir { background: #eef1f7; color: #4b5563; }
+
+.next-jalon-cell { font-size: 13px; }
+.next-jalon-cell .nj-date { color: var(--text-muted); font-size: 12px; }

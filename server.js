@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { readDb, writeDb, genId } = require('./db');
 const { summarizeTranscript } = require('./summarizer');
+const { BEESTART_TEMPLATE } = require('./templates');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -96,6 +97,28 @@ app.post('/api/cabinets/:id/jalons', (req, res) => {
   cabinet.jalons.push(jalon);
   writeDb(db);
   res.status(201).json(jalon);
+});
+
+// Créer d'un coup les jalons de la trame standard beeStart (sans dates)
+app.post('/api/cabinets/:id/jalons/appliquer-trame', (req, res) => {
+  const db = readDb();
+  const cabinet = db.cabinets.find((c) => c.id === req.params.id);
+  if (!cabinet) return res.status(404).json({ error: 'Cabinet introuvable' });
+
+  const nouveauxJalons = BEESTART_TEMPLATE.map((item) => ({
+    id: genId('jal'),
+    nom: item.nom,
+    attendu: item.attendu,
+    dateInitiale: null,
+    datePrevue: null,
+    statut: 'a_venir',
+    historiqueDecalages: [],
+    transcripts: [],
+  }));
+
+  cabinet.jalons.push(...nouveauxJalons);
+  writeDb(db);
+  res.status(201).json(cabinet);
 });
 
 app.put('/api/cabinets/:id/jalons/:jalonId', (req, res) => {

@@ -52,7 +52,9 @@ async function loadCabinets() {
   if (activeCabinetId) {
     const still = cabinets.find((c) => c.id === activeCabinetId);
     if (still) renderCabinetDetail(still);
-    else { activeCabinetId = null; renderEmpty(); }
+    else { activeCabinetId = null; renderOverview(); }
+  } else {
+    renderOverview();
   }
 }
 
@@ -80,8 +82,115 @@ function renderCabinetList() {
 }
 
 function renderEmpty() {
-  mainContent.innerHTML = `<div class="empty-state"><p>Sélectionne un cabinet à gauche, ou crée-en un nouveau.</p></div>`;
+  renderOverview();
 }
+
+// ---------- Vue d'ensemble ----------
+
+function computeCabinetProgress(cabinet) {
+  const total = cabinet.jalons.length;
+  const faits = cabinet.jalons.filter((j) => j.statut === 'fait').length;
+  const enRetard = cabinet.jalons.filter((j) => j.statut === 'en_retard').length;
+  const pct = total === 0 ? 0 : Math.round((faits / total) * 100);
+
+  let statutGlobal = 'a_venir';
+  if (total > 0 && faits === total) statutGlobal = 'termine';
+  else if (enRetard > 0) statutGlobal = 'en_retard';
+  else if (cabinet.jalons.some((j) => j.statut === 'en_cours')) statutGlobal = 'en_cours';
+  else if (faits > 0) statutGlobal = 'en_cours';
+
+  // Prochain jalon non fait, trié par date prévue la plus proche
+  const prochain = cabinet.jalons
+    .filter((j) => j.statut !== 'fait')
+    .sort((a, b) => {
+      if (!a.datePrevue) return 1;
+      if (!b.datePrevue) return -1;
+      return new Date(a.datePrevue) - new Date(b.datePrevue);
+    })[0] || null;
+
+  return {
+    total, faits, enRetard, pct, statutGlobal, prochain,
+  };
+}
+
+const STATUT_GLOBAL_LABELS = {
+  termine: 'Terminé',
+  en_retard: 'En retard',
+  en_cours: 'En cours',
+  a_venir: 'À venir',
+};
+
+function renderOverview() {
+  activeCabinetId = null;
+  renderCabinetList();
+
+  if (cabinets.length === 0) {
+    mainContent.innerHTML = `<div class="empty-state"><p>Aucun cabinet pour l'instant. Crée-en un pour commencer.</p></div>`;
+    return;
+  }
+
+  const rows = cabinets.map((c) => {
+    const p = computeCabinetProgress(c);
+    return { cabinet: c, ...p };
+  });
+
+  mainContent.innerHTML = `
+    <div class="section-title" style="margin-top:0;">
+      <h3>Vue d'ensemble des cabinets</h3>
+    </div>
+    <div class="overview-table-wrap">
+      <table class="overview-table">
+        <thead>
+          <tr>
+            <th>Cabinet</th>
+            <th>Groupe pilote</th>
+            <th>Commercial</th>
+            <th>CTD</th>
+            <th>Gestionnaire</th>
+            <th>Avancement</th>
+            <th>Statut</th>
+            <th>Prochain jalon</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr data-cabinet-id="${r.cabinet.id}">
+              <td><strong>${escapeHtml(r.cabinet.nom)}</strong></td>
+              <td>${escapeHtml(r.cabinet.groupePilote) || '—'}</td>
+              <td>${escapeHtml(r.cabinet.commercial) || '—'}</td>
+              <td>${escapeHtml(r.cabinet.ctd) || '—'}</td>
+              <td>${escapeHtml(r.cabinet.gestionnaire) || '—'}</td>
+              <td>
+                <div class="progress-cell">
+                  <div class="progress-bar"><div class="progress-bar-fill" style="width:${r.pct}%;"></div></div>
+                  <span class="progress-label">${r.faits}/${r.total}</span>
+                </div>
+              </td>
+              <td><span class="badge badge-global-${r.statutGlobal}">${STATUT_GLOBAL_LABELS[r.statutGlobal]}${r.enRetard > 0 ? ` (${r.enRetard})` : ''}</span></td>
+              <td class="next-jalon-cell">
+                ${r.prochain
+                  ? `${escapeHtml(r.prochain.nom)}<div class="nj-date">${formatDate(r.prochain.datePrevue)}</div>`
+                  : '<span class="hint">—</span>'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  mainContent.querySelectorAll('tr[data-cabinet-id]').forEach((tr) => {
+    tr.addEventListener('click', () => {
+      const cabinet = cabinets.find((c) => c.id === tr.dataset.cabinetId);
+      if (!cabinet) return;
+      activeCabinetId = cabinet.id;
+      renderCabinetList();
+      renderCabinetDetail(cabinet);
+    });
+  });
+}
+
+document.getElementById('btn-overview').addEventListener('click', renderOverview);
 
 function renderCabinetDetail(cabinet) {
   mainContent.innerHTML = `
@@ -105,7 +214,10 @@ function renderCabinetDetail(cabinet) {
 
     <div class="section-title">
       <h3>Jalons du déploiement</h3>
-      <button class="btn btn-primary btn-sm" data-action="add-jalon">+ Ajouter un jalon</button>
+      <div>
+        <button class="btn btn-sm" data-action="appliquer-trame">Appliquer la trame beeStart</button>
+        <button class="btn btn-primary btn-sm" data-action="add-jalon">+ Ajouter un jalon</button>
+      </div>
     </div>
     <div id="jalons-container"></div>
   `;
@@ -113,6 +225,7 @@ function renderCabinetDetail(cabinet) {
   mainContent.querySelector('[data-action="edit-cabinet"]').addEventListener('click', () => openCabinetDialog(cabinet));
   mainContent.querySelector('[data-action="delete-cabinet"]').addEventListener('click', () => deleteCabinet(cabinet.id));
   mainContent.querySelector('[data-action="add-jalon"]').addEventListener('click', () => openJalonDialog(cabinet.id));
+  mainContent.querySelector('[data-action="appliquer-trame"]').addEventListener('click', () => appliquerTrame(cabinet.id));
 
   const container = document.getElementById('jalons-container');
   if (cabinet.jalons.length === 0) {
@@ -235,7 +348,6 @@ async function deleteCabinet(id) {
   await api(`/api/cabinets/${id}`, { method: 'DELETE' });
   if (activeCabinetId === id) activeCabinetId = null;
   await loadCabinets();
-  renderEmpty();
 }
 
 // ---------- Actions jalon ----------
@@ -274,6 +386,14 @@ async function deleteJalon(cabinetId, jalonId) {
   if (!confirm('Supprimer ce jalon ?')) return;
   await api(`/api/cabinets/${cabinetId}/jalons/${jalonId}`, { method: 'DELETE' });
   await loadCabinets();
+}
+
+async function appliquerTrame(cabinetId) {
+  if (!confirm('Ajouter les 6 jalons de la trame beeStart à ce cabinet (sans dates) ?')) return;
+  try {
+    await api(`/api/cabinets/${cabinetId}/jalons/appliquer-trame`, { method: 'POST' });
+    await loadCabinets();
+  } catch (e) { alert(e.message); }
 }
 
 // ---------- Décaler ----------
@@ -360,4 +480,5 @@ function escapeHtml(str) {
 (async function init() {
   await loadConfig();
   await loadCabinets();
+  renderOverview();
 })();
