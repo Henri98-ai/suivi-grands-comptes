@@ -1,0 +1,12 @@
+{
+  "name": "grands-comptes-tracker",
+  "version": "1.0.0",
+  "description": "Suivi des déploiements bobbee chez les cabinets grands comptes : fiches cabinet, jalons, décalages et résumés de RDV.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Suivi déploiements grands comptes</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <h1>Déploiements grands comptes</h1>
+      <button id="btn-new-cabinet" class="btn btn-primary">+ Nouveau cabinet</button>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <input id="search" type="text" placeholder="Rechercher un cabinet..." />
+        <ul id="cabinet-list" class="cabinet-list"></ul>
+      </aside>
+
+      <main id="main-content" class="main-content">
+        <div class="empty-state">
+          <p>Sélectionne un cabinet à gauche, ou crée-en un nouveau.</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modale : créer/éditer un cabinet -->
+  <dialog id="dlg-cabinet">
+    <form id="form-cabinet" method="dialog">
+      <h2 id="dlg-cabinet-title">Nouveau cabinet</h2>
+      <label>Nom du cabinet *<input name="nom" required /></label>
+      <label>Groupe pilote<input name="groupePilote" /></label>
+      <label>Commercial<input name="commercial" /></label>
+      <label>CTD<input name="ctd" /></label>
+      <label>Gestionnaire en charge<input name="gestionnaire" /></label>
+      <label>Date de début<input name="dateDebut" type="date" /></label>
+      <label>Notes<textarea name="notes" rows="3"></textarea></label>
+      <div class="dlg-actions">
+        <button type="button" class="btn" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modale : ajouter/éditer un jalon -->
+  <dialog id="dlg-jalon">
+    <form id="form-jalon" method="dialog">
+      <h2 id="dlg-jalon-title">Nouveau jalon</h2>
+      <label>Nom du jalon *<input name="nom" required placeholder="ex : Formation paramétrage" /></label>
+      <label>Ce qui est attendu<textarea name="attendu" rows="3" placeholder="Décris ce qui doit être fait/validé à ce jalon"></textarea></label>
+      <label>Date prévue<input name="datePrevue" type="date" /></label>
+      <div class="dlg-actions">
+        <button type="button" class="btn" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modale : décaler un jalon -->
+  <dialog id="dlg-decaler">
+    <form id="form-decaler" method="dialog">
+      <h2>Décaler le jalon</h2>
+      <label>Nouvelle date *<input name="nouvelleDate" type="date" required /></label>
+      <label>Raison du décalage<textarea name="raison" rows="2"></textarea></label>
+      <div class="dlg-actions">
+        <button type="button" class="btn" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary">Confirmer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modale : déposer une transcription -->
+  <dialog id="dlg-transcript">
+    <form id="form-transcript" method="dialog">
+      <h2>Déposer une transcription de RDV</h2>
+      <label>Date du RDV<input name="date" type="date" /></label>
+      <label>Transcription *<textarea name="texte" rows="10" required placeholder="Colle ici la transcription brute du RDV"></textarea></label>
+      <p id="transcript-hint" class="hint"></p>
+      <div class="dlg-actions">
+        <button type="button" class="btn" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary">Envoyer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
