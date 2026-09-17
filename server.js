@@ -196,6 +196,7 @@ app.put('/api/cabinets/:id/jalons/:jalonId', (req, res) => {
     if (req.body[f.id] !== undefined) jalon[f.id] = req.body[f.id];
   });
   if (req.body.statut !== undefined) jalon.statut = req.body.statut;
+  if (req.body.datePrevue !== undefined) jalon.datePrevue = req.body.datePrevue || null;
 
   writeDb(db);
   res.json(jalon);
